@@ -1,0 +1,40 @@
+
+set_tag                     User Manuals                    set_tag
+
+
+NAME
+    set_tag - tag setting library
+
+SYNOPSIS
+
+    compile: cc set_tag.c -set_tag
+    run: ./set_tag [int]
+
+DESCRIPTION
+    function signature
+    int set_tag(int PID, int newvalue);
+
+    this essentially allows for a process to be assigned a tag from the process table
+
+
+OPTIONS
+
+
+FILES
+  /usr/src/servers/pm/do_project1_syscall.c
+  /usr/src/lib/libc/sys-minix/tag.c
+
+  tag.c c allows library access to the system call:
+
+  return   _syscall(PM_PROC_NR, DO_PROJECT1_SYSCALL, &m);
+
+
+D
+
+AUTHOR
+  MICHAEL LOWE COP 4600 SPRING 2017
+
+SEE ALSO
+    get_tag.2
+
+minix                Last change: FEB 2017

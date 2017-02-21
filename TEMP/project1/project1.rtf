@@ -1,0 +1,25 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1504\cocoasubrtf760
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww12960\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 Project 1\
+\
+COP 4600\
+SPRING 2017\
+\
+Overview: \
+In this project I was asked to create a system call that would allow for a tag value to either be written or read. The specs included the following: \
+	1) the tag can only be read if the process has root access\
+	2) the tag  can both be read and written with root access \
+\
+The reason behind this constraint is to allow processes that have matching process ID\'92s with both the current process and its own ID to write to be able to write the tag. Thus, another process cannot do that outside of root. This affectively secures access to the procedure. \
+\
+In implementing the tag assignment control to  my System call \'93do-project1-syscall.c\'94 I had a flag that allowed for me to tell whether the value was a either a -1 or a 1 from my message table. Once returned, I could tell the via the flag whether or not, the system would call get or set tag with both root and non root access. \
+	note: I tested this using all cases, where the user either had root access or not as well as the numbers they could assign processes. \
+\
+\
+\
+}

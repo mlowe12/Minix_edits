@@ -1,0 +1,346 @@
+diff --git a/include/minix/callnr.h b/include/minix/callnr.h
+index 6f145cf..08a6086 100644
+--- a/include/minix/callnr.h
++++ b/include/minix/callnr.h
+@@ -1,28 +1,28 @@
+ #define NCALLS		 114	/* number of system calls allowed */
+
+ /* In case it isn't obvious enough: this list is sorted numerically. */
+-#define EXIT		   1
+-#define FORK		   2
+-#define READ		   3
+-#define WRITE		   4
+-#define OPEN		   5
+-#define CLOSE		   6
++#define EXIT		   1
++#define FORK		   2
++#define READ		   3
++#define WRITE		   4
++#define OPEN		   5
++#define CLOSE		   6
+ #define WAIT		   7
+-#define CREAT		   8
+-#define LINK		   9
+-#define UNLINK		  10
++#define CREAT		   8
++#define LINK		   9
++#define UNLINK		  10
+ #define WAITPID		  11
+-#define CHDIR		  12
++#define CHDIR		  12
+ #define TIME		  13
+-#define MKNOD		  14
++#define MKNOD		  14
+ #define CHMOD		  15
+-#define CHOWN		  16
++#define CHOWN		  16
+ #define BRK		  17
+ #define PREV_STAT	  18
+ #define LSEEK		  19
+ #define MINIX_GETPID	  20
+-#define MOUNT		  21
+-#define UMOUNT		  22
++#define MOUNT		  21
++#define UMOUNT		  22
+ #define SETUID		  23
+ #define GETUID		  24
+ #define STIME		  25
+@@ -30,18 +30,18 @@
+ #define ALARM		  27
+ #define PREV_FSTAT	  28
+ #define PAUSE		  29
+-#define UTIME		  30
++#define UTIME		  30
+ #define GETEPINFO	  31
+ #define SETGROUPS	  32
+-#define ACCESS		  33
++#define ACCESS		  33
+ #define GETGROUPS	  34
+-#define SYNC		  36
++#define SYNC		  36
+ #define KILL		  37
+ #define RENAME		  38
+ #define MKDIR		  39
+ #define RMDIR		  40
+-#define DUP		  41
+-#define PIPE		  42
++#define DUP		  41
++#define PIPE		  42
+ #define TIMES		  43
+ #define SYMLINK		  45
+ #define SETGID		  46
+@@ -56,8 +56,8 @@
+ #define FCNTL		  55
+ #define FS_READY	  57
+ #define EXEC		  59
+-#define UMASK		  60
+-#define CHROOT		  61
++#define UMASK		  60
++#define CHROOT		  61
+ #define SETSID		  62
+ #define GETPGRP		  63
+ #define ITIMER		  64
+@@ -65,6 +65,7 @@
+ #define SETGROUPS_O	  66
+ #define GETMCONTEXT       67
+ #define SETMCONTEXT       68
++#define DO_PROJECT1_SYSCALL       69
+
+ /* Posix signal handling. */
+ #define SIGACTION	  71
+@@ -109,7 +110,7 @@
+
+ #define PM_GETSID	113	/* PM getsid() */
+
+-#define TASK_REPLY	121	/* to VFS: reply code from drivers, not
++#define TASK_REPLY	121	/* to VFS: reply code from drivers, not
+ 				 * really a standalone call.
+ 				 */
+ #define MAPDRIVER      122     /* to VFS, map a device */
+diff --git a/include/unistd.h b/include/unistd.h
+index 55a146b..5edc0d4 100644
+--- a/include/unistd.h
++++ b/include/unistd.h
+@@ -194,7 +194,7 @@ int	 ftruncate(int, off_t);
+  */
+ #if (_POSIX_C_SOURCE - 0) >= 199309L || (_XOPEN_SOURCE - 0) >= 500 || \
+     defined(_NETBSD_SOURCE)
+-#ifndef __minix
++#ifndef __minix
+ int	 fdatasync(int);
+ #endif /* !__minix */
+ int	 fsync(int);
+@@ -437,6 +437,10 @@ extern	 int optreset;		/* getopt(3) external variable */
+ extern	 char *suboptarg;	/* getsubopt(3) external variable */
+ #endif
+
++int get_tag(int PID);
++int set_tag(int PID, int new_value);
++
++
+ __END_DECLS
+
+ #ifdef __minix
+diff --git a/lib/libc/sys-minix/Makefile.inc b/lib/libc/sys-minix/Makefile.inc
+index 6f52097..883c552 100644
+--- a/lib/libc/sys-minix/Makefile.inc
++++ b/lib/libc/sys-minix/Makefile.inc
+@@ -16,7 +16,7 @@ SRCS+= 	accept.c access.c bind.c brk.c sbrk.c m_closefrom.c getsid.c \
+ 	vectorio.c shutdown.c sigaction.c sigpending.c sigreturn.c sigsuspend.c\
+ 	sigprocmask.c socket.c socketpair.c stat.c statvfs.c symlink.c \
+ 	sync.c syscall.c sysuname.c truncate.c umask.c unlink.c write.c \
+-	_exit.c _ucontext.c environ.c __getcwd.c vfork.c sizeup.c init.c
++	_exit.c _ucontext.c environ.c __getcwd.c vfork.c sizeup.c init.c tag.c
+
+ # Minix specific syscalls.
+ SRCS+= cprofile.c lseek64.c sprofile.c _mcontext.c
+diff --git a/lib/libc/sys-minix/tag.c b/lib/libc/sys-minix/tag.c
+new file mode 100644
+index 0000000..f1abf0c
+--- /dev/null
++++ b/lib/libc/sys-minix/tag.c
+@@ -0,0 +1,30 @@
++
++#include <lib.h>
++
++int get_tag(int PID) {
++
++  message m;  // Minix uses message to pass parameters to a system call
++  m.m1_i1 = 0;
++  m.m1_i2 = PID;
++
++return   _syscall(PM_PROC_NR, DO_PROJECT1_SYSCALL, &m);
++      /* _syscall leads to the system server identified by PM_PRO_NR (the PM
++       * server process) invoking the function identified by call number
++       * PRINTMSG with parameters in the message copied to address &m
++       */
++}
++
++int set_tag(int PID, int new_value) {
++
++  message m;  // Minix uses message to pass parameters to a system call
++  m.m1_i1 = 1;
++  m.m1_i2 = PID;
++  m.m1_i3 = new_value;
++
++
++return  _syscall(PM_PROC_NR, DO_PROJECT1_SYSCALL, &m);
++      /* _syscall leads to the system server identified by PM_PRO_NR (the PM
++       * server process) invoking the function identified by call number
++       * PRINTMSG with parameters in the message copied to address &m
++       */
++}
+diff --git a/servers/pm/Makefile b/servers/pm/Makefile
+index 9065432..88a95de 100644
+--- a/servers/pm/Makefile
++++ b/servers/pm/Makefile
+@@ -4,7 +4,7 @@
+ PROG=	pm
+ SRCS=	main.c forkexit.c break.c exec.c time.c alarm.c \
+ 	signal.c utility.c table.c getset.c misc.c \
+-	profile.c schedule.c
++	profile.c schedule.c do_project1_syscall.c
+
+ .if ${USE_MCONTEXT} != "no"
+ SRCS+= mcontext.c
+diff --git a/servers/pm/do_project1_syscall.c b/servers/pm/do_project1_syscall.c
+new file mode 100644
+index 0000000..ffd4eda
+--- /dev/null
++++ b/servers/pm/do_project1_syscall.c
+@@ -0,0 +1,44 @@
++#include <stdio.h>
++#include "pm.h"
++#include "mproc.h"
++
++
++int do_project1_syscall(void){
++
++    int z_flag = m_in.m1_i1;
++    int PID = m_in.m1_i2;
++
++    struct mproc* req_process = find_proc(PID);
++
++
++    if(req_process == NULL){return -1;}
++
++
++    if(z_flag){
++
++      // perform set_tag
++        int new_value = m_in.m1_i3;
++
++        if(new_value < 0){return -1; }
++        if(mp->mp_effuid != 0){return -1;}
++
++
++        req_process->tag = new_value;
++
++        return req_process->tag;
++    }
++
++
++
++    else{
++
++      if(mp->mp_effuid != 0 && mp->mp_pid != PID){return -1;}
++
++      //perform get_tag
++      return req_process->tag;
++
++    }
++
++      //printf("System call 'DO_PROJECT1_SYSCALL' is called. %d\n", m_in.m1_i1);
++
++}
+diff --git a/servers/pm/forkexit.c b/servers/pm/forkexit.c
+index 6e01f41..3cc2ca4 100644
+--- a/servers/pm/forkexit.c
++++ b/servers/pm/forkexit.c
+@@ -56,7 +56,7 @@ int do_fork()
+   * way through is such a nuisance.
+   */
+   rmp = mp;
+-  if ((procs_in_use == NR_PROCS) ||
++  if ((procs_in_use == NR_PROCS) ||
+   		(procs_in_use >= NR_PROCS-LAST_FEW && rmp->mp_effuid != 0))
+   {
+   	printf("PM: warning, process table is full!\n");
+@@ -157,7 +157,7 @@ int do_srv_fork()
+   * way through is such a nuisance.
+   */
+   rmp = mp;
+-  if ((procs_in_use == NR_PROCS) ||
++  if ((procs_in_use == NR_PROCS) ||
+   		(procs_in_use >= NR_PROCS-LAST_FEW && rmp->mp_effuid != 0))
+   {
+   	printf("PM: warning, process table is full!\n");
+@@ -294,8 +294,8 @@ int dump_core;			/* flag indicating whether to dump core */
+   p_mp->mp_child_utime += user_time + rmp->mp_child_utime; /* add user time */
+   p_mp->mp_child_stime += sys_time + rmp->mp_child_stime; /* add system time */
+
+-  /* Tell the kernel the process is no longer runnable to prevent it from
+-   * being scheduled in between the following steps. Then tell VFS that it
++  /* Tell the kernel the process is no longer runnable to prevent it from
++   * being scheduled in between the following steps. Then tell VFS that it
+    * the process has exited and finally, clean up the process at the kernel.
+    * This order is important so that VFS can tell drivers to cancel requests
+    * such as copying to/ from the exiting process, before it is gone.
+@@ -346,7 +346,7 @@ int dump_core;			/* flag indicating whether to dump core */
+   rmp->mp_flags |= EXITING;
+
+   /* Keep the process around until VFS is finished with it. */
+-
++
+   rmp->mp_exitstatus = (char) exit_status;
+
+   /* For normal exits, try to notify the parent as soon as possible.
+@@ -399,7 +399,7 @@ int dump_core;			/* flag indicating whether to dump core */
+ 	*/
+ 	printf("PM: The scheduler did not want to give up "
+ 		"scheduling %s, ret=%d.\n", rmp->mp_name, r);
+-  }
++  }
+
+   /* sched_stop is either called when the process is exiting or it is
+    * being moved between schedulers. If it is being moved between
+@@ -443,9 +443,9 @@ int dump_core;			/* flag indicating whether to dump core */
+  *===========================================================================*/
+ int do_waitpid()
+ {
+-/* A process wants to wait for a child to terminate. If a child is already
+- * waiting, go clean it up and let this WAIT call terminate.  Otherwise,
+- * really wait.
++/* A process wants to wait for a child to terminate. If a child is already
++ * waiting, go clean it up and let this WAIT call terminate.  Otherwise,
++ * really wait.
+  * A process calling WAIT never gets a reply in the usual way at the end
+  * of the main loop (unless WNOHANG is set or no qualifying child exists).
+  * If a child has already exited, the routine tell_parent() sends the reply
+@@ -724,6 +724,6 @@ register struct mproc *rmp;	/* tells which process is exiting */
+   rmp->mp_flags = 0;
+   rmp->mp_child_utime = 0;
+   rmp->mp_child_stime = 0;
++  rmp->tag = 0;
+   procs_in_use--;
+ }
+-
+diff --git a/servers/pm/mproc.h b/servers/pm/mproc.h
+index 80afb4e..cb7232e 100644
+--- a/servers/pm/mproc.h
++++ b/servers/pm/mproc.h
+@@ -70,6 +70,8 @@ EXTERN struct mproc {
+   char mp_name[PROC_NAME_LEN];	/* process name */
+
+   int mp_magic;			/* sanity check, MP_MAGIC */
++
++  int tag;  /*tag modification */
+ } mproc[NR_PROCS];
+
+ /* Flag values */
+diff --git a/servers/pm/proto.h b/servers/pm/proto.h
+index 00646d3..eab4b8c 100644
+--- a/servers/pm/proto.h
++++ b/servers/pm/proto.h
+@@ -103,3 +103,8 @@ struct mproc *find_proc(pid_t lpid);
+ int nice_to_priority(int nice, unsigned *new_q);
+ int pm_isokendpt(int ep, int *proc);
+ void tell_vfs(struct mproc *rmp, message *m_ptr);
++
++
++
++/*project1_syscall.c*/
++int do_project1_syscall(void);
+diff --git a/servers/pm/table.c b/servers/pm/table.c
+index 5051cec..a69b3af 100644
+--- a/servers/pm/table.c
++++ b/servers/pm/table.c
+@@ -80,7 +80,7 @@ int (*call_vec[])(void) = {
+ 	do_set, 	/* 66 = setgroups */
+ 	do_getmcontext,	/* 67 = getmcontext */
+ 	do_setmcontext,	/* 68 = setmcontext */
+-	no_sys,		/* 69 = unused	*/
++	do_project1_syscall,		/* 69 = USED FOR SYSTEM CALL PROJECT1	*/
+ 	no_sys,		/* 70 = unused	*/
+ 	do_sigaction,	/* 71 = sigaction   */
+ 	do_sigsuspend,	/* 72 = sigsuspend  */
